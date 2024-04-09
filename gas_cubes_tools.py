@@ -3,6 +3,7 @@ import numpy as np
 import time
 import scipy.constants as c
 import matplotlib.pyplot as plt
+import bettermoments as bm
 
 def open_cube(cube_fits):
     hdulist_cube = fits.open(cube_fits)
@@ -145,19 +146,6 @@ def spectrum(cube_fits,region=None,channel_range=None):
     return fluxes, velocities, channels
 
 
-def plot_spectrum(cube_fits,region=None,channel_range=None,velocities=None, molecule=None):
-    fluxes, velocities, channels = fluxes, velocities, channels
-    outputname = cube_fits.split('.fits')[0]
-    label = molecule if molecule != None else ''
-    if velocities == True:
-        plt.plot(velocities, fluxes, label = label)
-        plt.xlabel('Velocity [km s$^{-1}$]')
-    else:
-        plt.plot(channels, fluxes, label = label)
-        plt.xlabel('Channels')
-    plt.legend()
-    plt.savefig('{0}_{1}_spectrum.pdf'.format(outputname,label))
-
 
 def auto_vel(cube_fits,n_chan=None,rms_times=None,region=None,channel_range=None):
     n_chan = 5 if n_chan==None else n_chan
@@ -174,6 +162,126 @@ def auto_vel(cube_fits,n_chan=None,rms_times=None,region=None,channel_range=None
             auto_velocities += [velocities[flux_pos]]
             auto_channels += [channels[flux_pos]]
     return auto_velocities, auto_channels
+
+
+def generate_moment_map(cube_fits,channel_range=None,smooth=None,polyorder=None,N_chan_rms=None,mask=None,clipping=None,smooth_threshold_level=None,outname=None,moment=None):
+    cube = cube_fits
+    path = cube_fits
+    data, velax = bm.load_cube(cube)
+    data = data[int(channel_range[0]):int(channel_range[-1]+1),:,:]
+    smoothing = smooth if smooth != None else 3
+    polyorder_smooth = polyorder if polyorder != None else 0
+    N = N_chan_rms if N_chan_rms != None else 5
+    smooth_threshold_mask = smooth_threshold_level if smooth_threshold_level != None else 3.0
+    first_channel = channel_range[0] if channel_range != None else 0
+    last_channel = channel_range[1] if channel_range != None else -1
+    last_channel = last_channel if last_channel == -1 else int(last_channel-np.shape(data)[2])
+    output_name = outname if outname != None else cube_fits.split('.fits')[0]
+    if moment == None: return "Choose a moment: zeroth or first" 
+
+    smoothed_data = bm.smooth_data(data=data, smooth=smoothing, polyorder=polyorder_smooth)
+
+    rms = bm.estimate_RMS(data=data, N=N)
+    rms_smoothed = bm.estimate_RMS(data=smoothed_data, N=N)
+
+    print('RMS = {:.1f} mJy/beam (original)'.format(rms * 1e3))
+    print('RMS = {:.1f} mJy/beam (smoothed)'.format(rms_smoothed * 1e3))
+
+    user_mask = bm.get_user_mask(data=data, user_mask_path=mask)
+    
+    threshold_mask = bm.get_threshold_mask(data=data,
+                                           clip=clipping,
+                                           smooth_threshold_mask=smooth_threshold_level)
+
+    channel_mask = bm.get_channel_mask(data=data,
+                                       firstchannel=0,
+                                       lastchannel=-1)
+
+    mask = bm.get_combined_mask(user_mask=user_mask,
+                                threshold_mask=threshold_mask,
+                                channel_mask=channel_mask,
+                                combine='and')
+    masked_data = smoothed_data * mask
+
+    if moment == 'zeroth':
+        moments_map = bm.collapse_zeroth(velax=velax, data=masked_data, rms=rms)
+        bm.save_to_FITS(moments=moments_map, method='zeroth',outname=output_name,path=path)
+    if moment == 'first':
+        moments_map = bm.collapse_first(velax=velax, data=masked_data, rms=rms)
+        bm.save_to_FITS(moments=moments_map, method='first',outname=output_name,path=path)
+
+def get_channel_range(cube_fits,N_chan_rms=None,region=None,rms_threshold=None,blue_red_chans=None):
+    fluxes, velocities, channels = spectrum(cube_fits,region=region)
+    peak_flux, pos_peak = np.max(fluxes), np.argmax(fluxes)
+    delta_flux_0 = peak_flux - fluxes[0]
+    delta_flux_f = peak_flux - fluxes[-1]
+    N = N_chan_rms if N_chan_rms != None else 5
+    rms = np.mean([np.sum(np.array(fluxes[0:N])**2)**(0.5)/N,np.sum(np.array(fluxes[-N-1:-1])**2)**(0.5)/N])
+    real_emission = []
+    real_emission_channel = []
+    rms_threshold=rms_threshold if rms_threshold != None else 5
+    #SNR = peak_flux/rms
+    #SNR_ratio = SNR_ratio if SNR_ratio != None else 0.1
+    #SNR_perc = SNR*SNR_ratio
+
+    for flux in fluxes:
+        if flux < rms*rms_threshold:
+        #if flux/rms < SNR_perc:
+            continue
+        else:
+            real_emission += [flux]
+            real_emission_channel += [np.where(fluxes==flux)[0][0]]
+
+    if blue_red_chans == True:
+        dist_chans = []
+        for i in np.arange(np.shape(real_emission_channel)[0]-1):
+            dist_chans += [real_emission_channel[int(i+1)] - real_emission_channel[int(i)]]
+        if np.shape(np.array(dist_chans))[0] == 0: return None,None
+        where_peak = np.argmax(np.array(dist_chans))
+        blue_chans = real_emission_channel[0:int(where_peak)+1]
+        red_chans = real_emission_channel[int(where_peak)+1:]
+        return blue_chans, red_chans
+    else:
+        return real_emission_channel
+
+
+def blueshift_fits(cube_fits,region=None,channel_range=None,rms_threshold=None,smooth=None,polyorder=None,N_chan_rms=None,mask=None,clipping=None,smooth_threshold_level=None,outname=None,moment=None):
+    blue_chans, red_chans = get_channel_range(cube_fits,N_chan_rms=N_chan_rms,region=region,rms_threshold=rms_threshold,blue_red_chans=True)
+    if blue_chans==None or red_chans==None: return
+    output_name = outname if outname != None else '{0}_blueshift'.format(cube_fits.split('.fits')[0])
+    if np.shape(np.array(blue_chans))[0] == 1: blue_chans = [int(blue_chans[0]-1),int(blue_chans[0])]
+    print('Blueshift Channels range: {0}'.format(blue_chans))
+    
+    generate_moment_map(cube_fits,
+    channel_range=blue_chans,
+    smooth=smooth,
+    polyorder=polyorder,
+    N_chan_rms=N_chan_rms,
+    mask=mask,
+    clipping=clipping,
+    smooth_threshold_level=smooth_threshold_level,
+    outname=output_name,
+    moment=moment)
+
+def redshift_fits(cube_fits,region=None,channel_range=None,rms_threshold=None,smooth=None,polyorder=None,N_chan_rms=None,mask=None,clipping=None,smooth_threshold_level=None,outname=None,moment=None):
+
+    blue_chans, red_chans = get_channel_range(cube_fits,N_chan_rms=N_chan_rms,region=region,rms_threshold=rms_threshold,blue_red_chans=True)
+    if blue_chans==None or red_chans==None: return
+    output_name = outname if outname != None else '{0}_redshift'.format(cube_fits.split('.fits')[0])
+    if np.shape(np.array(red_chans))[0] == 1: red_chans = [int(red_chans[0]),int(red_chans[0]+1)]
+    print('Redshift Channels range: {0}'.format(red_chans))
+
+    generate_moment_map(cube_fits,
+    channel_range=red_chans,
+    smooth=smooth,
+    polyorder=polyorder,
+    N_chan_rms=N_chan_rms,
+    mask=mask,
+    clipping=clipping,
+    smooth_threshold_level=smooth_threshold_level,
+    outname=output_name,
+    moment=moment)
+
 
 
 
