@@ -282,7 +282,29 @@ def redshift_fits(cube_fits,region=None,channel_range=None,rms_threshold=None,sm
     outname=output_name,
     moment=moment)
 
+def pv_diagrams(cube,coords=None,channels=None,av_width=None):
 
+    if av_width == None: av_width = 0
+    x0,y0,x1,y1 = coords[0][0],coords[0][1],coords[1][0],coords[1][1]
+    cube, hdr = open_cube(cube_fits)
+    if channels == None: channels = [0,-1]
+    chan0, chanf = int(channels[0]),int(channels[1])
+    cube_final = cube[chan0:chanf+1,:,:]
+    alpha = 90 - np.rad2deg(np.arctan(np.sqrt((x0-x1)**2/(y0-y1)**2)))
+    pv_grid = []
+    x0 = int(x0 - np.shape(cube)[2]/2)+1
+    y0 = int(y0 - np.shape(cube)[1]/2)+1
+    x1 = int(x1 - np.shape(cube)[2]/2)+1
+    y1 = int(y1 - np.shape(cube)[1]/2)+1
+    for chan in cube_final:
+        image_rotated = rotate(chan, alpha, reshape=False)
+        alpha_0 = np.deg2rad(alpha)
+        xn0 = int((x0*np.cos(alpha_0))-(y0*np.sin(alpha_0))+np.shape(chan)[1]/2)
+        xn1 = int((x1*np.cos(alpha_0))-(y1*np.sin(alpha_0))+np.shape(chan)[1]/2)
+        yn0 = int((x0*np.sin(alpha_0))+(y0*np.cos(alpha_0))+np.shape(chan)[0]/2)
+        pv_row = image_rotated[yn0][min([xn0,xn1]):max([xn0,xn1])+1]
+        pv_grid += [pv_row]
+    return pv_grid
 
 
 
