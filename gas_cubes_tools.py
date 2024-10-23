@@ -298,15 +298,17 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
     av_width_a, av_width_b = int(av_width/2), av_width%2
     chan0, chanf = int(channels[0]),int(channels[1])
     cube_final = cube[chan0:chanf]
-    alpha = np.rad2deg(np.arctan(np.sqrt((y0-y1)**2/(x0-x1)**2)))
-    print(np.rad2deg(np.arctan(np.sqrt((y0-y1)**2/(x0-x1)**2))))
+    alpha = -np.rad2deg(np.arctan(np.sqrt((y0-y1)**2/(x0-x1)**2)))
+    print('The rotation degree is: {0}'.format(alpha))
     pv_grid = []
     x0 = int(x0 - np.shape(cube)[2]/2)+1
     y0 = int(y0 - np.shape(cube)[1]/2)+1
     x1 = int(x1 - np.shape(cube)[2]/2)+1
     y1 = int(y1 - np.shape(cube)[1]/2)+1
-
+    chan_count = chan0
     for chan in cube_final:
+        print('Analyzing Channel: {0}'.format(chan_count))
+        chan_count += 1
         chan[np.isnan(chan)] = 0
         image_rotated = rotate(chan, alpha, reshape=False)
         alpha_0 = np.deg2rad(-alpha)
@@ -328,11 +330,11 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
             pv_row_av = [np.mean(col) for col in pv_transpose]
             pv_grid += [list(reversed(pv_row_av))]
     if outputname==None: outputname='test'
-    plt.imshow(cube[114],origin='lower',cmap='rainbow')
+    plt.imshow(cube[48],origin='lower',cmap='rainbow',vmin=np.max(cube[48])*0.1)
     plt.plot([coords[0][0],coords[1][0]],[coords[0][1],coords[1][1]],color='red')
     plt.savefig('{0}_with_PV_line.pdf'.format(outputname))
-    image_rotated = rotate(cube[114], alpha, reshape=False)
-    plt.imshow(image_rotated,origin='lower',cmap='rainbow')
+    image_rotated = rotate(cube[48], alpha, reshape=False)
+    plt.imshow(image_rotated,origin='lower',cmap='rainbow',vmin=np.max(cube[48])*0.1)
     plt.plot([xn0,xn1],[yn0,yn1],color='red')
     plt.savefig('{0}_with_PV_line_rotated.pdf'.format(outputname))
     plt.imshow(pv_grid,origin='lower',vmin=np.min(pv_grid),vmax=np.max(pv_grid),cmap='rainbow',aspect='auto')
