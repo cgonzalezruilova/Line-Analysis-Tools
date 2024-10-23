@@ -306,16 +306,16 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
     x1 = int(x1 - np.shape(cube)[2]/2)+1
     y1 = int(y1 - np.shape(cube)[1]/2)+1
     chan_count = chan0
+    alpha_0 = np.deg2rad(-alpha)
+    xn0 = int((x0*np.cos(alpha_0))-(y0*np.sin(alpha_0))+np.shape(cube_final[0])[1]/2)
+    xn1 = int((x1*np.cos(alpha_0))-(y1*np.sin(alpha_0))+np.shape(cube_final[0])[1]/2)
+    yn0 = int((x0*np.sin(alpha_0))+(y0*np.cos(alpha_0))+np.shape(cube_final[0])[0]/2)
+    yn1 = int((x1*np.sin(alpha_0))+(y1*np.cos(alpha_0))+np.shape(cube_final[0])[0]/2)
     for chan in cube_final:
         print('Analyzing Channel: {0}'.format(chan_count))
         chan_count += 1
         chan[np.isnan(chan)] = 0
         image_rotated = rotate(chan, alpha, reshape=False)
-        alpha_0 = np.deg2rad(-alpha)
-        xn0 = int((x0*np.cos(alpha_0))-(y0*np.sin(alpha_0))+np.shape(chan)[1]/2)
-        xn1 = int((x1*np.cos(alpha_0))-(y1*np.sin(alpha_0))+np.shape(chan)[1]/2)
-        yn0 = int((x0*np.sin(alpha_0))+(y0*np.cos(alpha_0))+np.shape(chan)[0]/2)
-        yn1 = int((x1*np.sin(alpha_0))+(y1*np.cos(alpha_0))+np.shape(chan)[0]/2)
         if av_width_a == 0 and av_width_b == 1:
             pv_row = image_rotated[yn0,min([xn0,xn1]):max([xn0,xn1])+1]
             pv_grid += [list(reversed(pv_row))]
