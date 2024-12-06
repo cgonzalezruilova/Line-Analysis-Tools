@@ -5,12 +5,13 @@ import scipy.constants as c
 import matplotlib.pyplot as plt
 import bettermoments as bm
 from scipy.ndimage import rotate
+from decimal import Decimal
 
 def open_cube(cube_fits):
     hdulist_cube = fits.open(cube_fits)
     hdr_cube = hdulist_cube[0].header
     data_cube = hdulist_cube[0].data
-    images_cube = data_cube[0,:,:,:] if np.shape(np.shape(data_cube))[0] >= 4 else data_cube 
+    images_cube = datacube[:,:,:,0] if np.shape(np.shape(data_cube))[0] >= 4 else data_cube 
     return images_cube, hdr_cube
 
 
@@ -76,8 +77,12 @@ def mask_fits(cube_fits, region=None, threshold=None, output_name=None):
     hdul.writeto(output_name,overwrite=True)
 
 def define_fig(image, form=None, center=None, radius=None):
-    y0 , x0 = center
+    if center != None:
+        y0, x0 = center      
+    if center == None:
+        y0, x0 = np.shape(image)[0]/2 , np.shape(image)[1]/2
     blank_image = np.zeros([np.shape(image)[0],np.shape(image)[1]])
+    blank_image[:] = np.nan
     I,J=np.meshgrid(np.arange(blank_image.shape[0]),np.arange(blank_image.shape[1]))
     if form == 'square':
         return image[y0-radius:y0+radius, x0-radius:x0+radius]
@@ -136,22 +141,37 @@ def chans2vel(cube_fits,channel_range=None):
     return velocity_array, channels_array
 
 
+def F2T(Flux, freq, bmaj, bmin):
+    '''
+    Flux in Jy/Beam
+    freq in GHz
+    bmaj and bmin in arcsec
+    '''
+    conversion = 1.222e6/(freq**2*bmaj*bmin)
+    print('conversion = {:.2E} K / Jy beam-1'.format(Decimal(conversion)))
+    return conversion*Flux
+
 def spectrum(cube_fits,region=None,channel_range=None):
     cube, hdr = open_cube(cube_fits)
     velocities, channels = chans2vel(cube_fits,channel_range=channel_range)
     if region!=None:
         mask_region = define_fig(image=cube[0], form=region[0], center=region[1], radius=region[2])
         fluxes = [np.nansum(cube[channel]*mask_region) for channel in channels]
+        mean_flux = np.array([np.nanmean(cube[channel]*mask_region) for channel in channels])
     else:
+        
         fluxes = [np.nansum(cube[channel]) for channel in channels]
-    return fluxes, velocities, channels
+        mean_flux = np.array([np.nanmean(cube[channel]) for channel in channels])
+
+    temperatures = F2T(mean_flux,hdr['RESTFRQ']/1e9,hdr['BMAJ']*3600.,hdr['BMIN']*3600.)
+    return fluxes, mean_flux,temperatures, velocities, channels
 
 
 
 def auto_vel(cube_fits,n_chan=None,rms_times=None,region=None,channel_range=None):
     n_chan = 5 if n_chan==None else n_chan
     rms_times = 3 if rms_times==None else rms_times
-    fluxes, velocities, channels = spectrum(cube_fits,region=region,channel_range=channel_range)
+    fluxes, temperatures, velocities, channels = spectrum(cube_fits,region=region,channel_range=channel_range)
     auto_velocities = []
     auto_channels = []
     rms = np.sqrt(np.mean(np.array((fluxes[0:n_chan]+fluxes[np.shape(fluxes)[0]-1-n_chan:]))**2))
@@ -169,21 +189,16 @@ def generate_moment_map(cube_fits,channel_range=None,smooth=None,polyorder=None,
     cube = cube_fits
     path = cube_fits
     data, velax = bm.load_cube(cube)
+    data = data[int(channel_range[0]):int(channel_range[-1]+1),:,:]
     smoothing = smooth if smooth != None else 3
     polyorder_smooth = polyorder if polyorder != None else 0
     N = N_chan_rms if N_chan_rms != None else 5
     smooth_threshold_mask = smooth_threshold_level if smooth_threshold_level != None else 3.0
-    first_channel = int(channel_range[0]) if channel_range != None else 0
-    last_channel = int(channel_range[1]) if channel_range != None else -1
-    last_channel = last_channel if last_channel == -1 else int(last_channel-np.shape(data)[0])
+    first_channel = channel_range[0] if channel_range != None else 0
+    last_channel = channel_range[1] if channel_range != None else -1
+    last_channel = last_channel if last_channel == -1 else int(last_channel-np.shape(data)[2])
     output_name = outname if outname != None else cube_fits.split('.fits')[0]
-
-    data = data[first_channel:last_channel,:,:]
-
     if moment == None: return "Choose a moment: zeroth or first" 
-    if moment != 'first':
-        if moment != 'zeroth':
-            return "Choose a moment: zeroth or first" 
 
     smoothed_data = bm.smooth_data(data=data, smooth=smoothing, polyorder=polyorder_smooth)
 
@@ -217,7 +232,7 @@ def generate_moment_map(cube_fits,channel_range=None,smooth=None,polyorder=None,
         bm.save_to_FITS(moments=moments_map, method='first',outname=output_name,path=path)
 
 def get_channel_range(cube_fits,N_chan_rms=None,region=None,rms_threshold=None,blue_red_chans=None):
-    fluxes, velocities, channels = spectrum(cube_fits,region=region)
+    fluxes, temperatures, velocities, channels = spectrum(cube_fits,region=region)
     peak_flux, pos_peak = np.max(fluxes), np.argmax(fluxes)
     delta_flux_0 = peak_flux - fluxes[0]
     delta_flux_f = peak_flux - fluxes[-1]
@@ -288,6 +303,7 @@ def redshift_fits(cube_fits,region=None,channel_range=None,rms_threshold=None,sm
     outname=output_name,
     moment=moment)
 
+
 def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=None):
 
     if av_width == None: av_width = 0
@@ -298,24 +314,22 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
     av_width_a, av_width_b = int(av_width/2), av_width%2
     chan0, chanf = int(channels[0]),int(channels[1])
     cube_final = cube[chan0:chanf]
-    alpha = -np.rad2deg(np.arctan(np.sqrt((y0-y1)**2/(x0-x1)**2)))
-    print('The rotation degree is: {0}'.format(alpha))
+    alpha = np.rad2deg(np.arctan(np.sqrt((y0-y1)**2/(x0-x1)**2)))
+    print(np.rad2deg(np.arctan(np.sqrt((y0-y1)**2/(x0-x1)**2))))
     pv_grid = []
     x0 = int(x0 - np.shape(cube)[2]/2)+1
     y0 = int(y0 - np.shape(cube)[1]/2)+1
     x1 = int(x1 - np.shape(cube)[2]/2)+1
     y1 = int(y1 - np.shape(cube)[1]/2)+1
-    chan_count = chan0
-    alpha_0 = np.deg2rad(-alpha)
-    xn0 = int((x0*np.cos(alpha_0))-(y0*np.sin(alpha_0))+np.shape(cube_final[0])[1]/2)
-    xn1 = int((x1*np.cos(alpha_0))-(y1*np.sin(alpha_0))+np.shape(cube_final[0])[1]/2)
-    yn0 = int((x0*np.sin(alpha_0))+(y0*np.cos(alpha_0))+np.shape(cube_final[0])[0]/2)
-    yn1 = int((x1*np.sin(alpha_0))+(y1*np.cos(alpha_0))+np.shape(cube_final[0])[0]/2)
+
     for chan in cube_final:
-        print('Analyzing Channel: {0}'.format(chan_count))
-        chan_count += 1
         chan[np.isnan(chan)] = 0
         image_rotated = rotate(chan, alpha, reshape=False)
+        alpha_0 = np.deg2rad(-alpha)
+        xn0 = int((x0*np.cos(alpha_0))-(y0*np.sin(alpha_0))+np.shape(chan)[1]/2)
+        xn1 = int((x1*np.cos(alpha_0))-(y1*np.sin(alpha_0))+np.shape(chan)[1]/2)
+        yn0 = int((x0*np.sin(alpha_0))+(y0*np.cos(alpha_0))+np.shape(chan)[0]/2)
+        yn1 = int((x1*np.sin(alpha_0))+(y1*np.cos(alpha_0))+np.shape(chan)[0]/2)
         if av_width_a == 0 and av_width_b == 1:
             pv_row = image_rotated[yn0,min([xn0,xn1]):max([xn0,xn1])+1]
             pv_grid += [list(reversed(pv_row))]
@@ -330,18 +344,16 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
             pv_row_av = [np.mean(col) for col in pv_transpose]
             pv_grid += [list(reversed(pv_row_av))]
     if outputname==None: outputname='test'
-    plt.imshow(cube[48],origin='lower',cmap='rainbow',vmin=np.max(cube[48])*0.1)
+    plt.imshow(cube[114],origin='lower',cmap='rainbow')
     plt.plot([coords[0][0],coords[1][0]],[coords[0][1],coords[1][1]],color='red')
     plt.savefig('{0}_with_PV_line.pdf'.format(outputname))
-    image_rotated = rotate(cube[48], alpha, reshape=False)
-    plt.imshow(image_rotated,origin='lower',cmap='rainbow',vmin=np.max(cube[48])*0.1)
+    image_rotated = rotate(cube[114], alpha, reshape=False)
+    plt.imshow(image_rotated,origin='lower',cmap='rainbow')
     plt.plot([xn0,xn1],[yn0,yn1],color='red')
     plt.savefig('{0}_with_PV_line_rotated.pdf'.format(outputname))
     plt.imshow(pv_grid,origin='lower',vmin=np.min(pv_grid),vmax=np.max(pv_grid),cmap='rainbow',aspect='auto')
     plt.savefig('{0}_PV.pdf'.format(outputname))
     return pv_grid
-
-
-
-
+    
+[[182,168],[233,187]]
 
