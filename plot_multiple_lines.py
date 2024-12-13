@@ -7,27 +7,67 @@ import math
 from astropy.wcs import WCS
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
+import gas_cubes_tools as gct
 
 
 
-#source='RA16_31_36.770'
-#directory='/Users/camilogonzalezruilova/Documents/ODISEA_Gas/BDs_ODISEA/'+source+'/'
+source = 'RA16_27_04.097'
 
 
-source='RA16_39_45.427'
-directory='/Volumes/TOSHIBA EXT/ODISEA_GAS/'
+
+'''
+
+
+# Moment maps for 12CO
+gct.generate_moment_map(source+'_CO_cube.fits',channel_range=[30,95],moment='zeroth')
+gct.generate_moment_map(source+'_CO_cube.fits',channel_range=[30,95],moment='first')
+# Moment maps for 13CO
+gct.generate_moment_map(source+'_13CO_cube.fits',channel_range=[30,90],moment='zeroth')
+gct.generate_moment_map(source+'_13CO_cube.fits',channel_range=[30,90],moment='first')
+# Moment maps for C18O
+gct.generate_moment_map(source+'_C18O_cube.fits',channel_range=[30,90],moment='zeroth')
+gct.generate_moment_map(source+'_C18O_cube.fits',channel_range=[30,90],moment='first')
+
+
+'''
+
+##################################################################
+##################################################################
+##################################################################
+
+
+source = source
+
+directory='/Volumes/Elements/ODISEA_GAS/'
 
 sufix_0 = '_cube_M0.fits'
 
 trans = ['CO','13CO','C18O']
 
-rms = [0.05, 0.025, 0.02] #[12co,13co,c18o]
+rms = np.array([86, 121, 68])*3 #[12co,13co,c18o]
 
-fov =  6.0  #radius of FOV in arcsecs
+fov =  12.0  #radius of FOV in arcsecs
+
+distance = 140.0 #Distance to star in pcs
+
+CDELT1 = 2.777777777778e-05
+
+
+
+
+fov = int(fov/(CDELT1*3600))  #radius of FOV in pixels
+reference_label = 500*(1/(CDELT1*3600))/distance #500 au reference line length in pixels
+
+
 
 moms_0 = [directory+source+'_'+line+sufix_0 for line in trans] 
 
 
+
+
+##################################################################
+##################################################################
+##################################################################
 
 
 
@@ -70,6 +110,7 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
     green_image = load_fits_image(image_paths[1])
     blue_image = load_fits_image(image_paths[2])
 
+
     red_image = preprocess_image(red_image, thresholds[0])
     green_image = preprocess_image(green_image, thresholds[1])
     blue_image = preprocess_image(blue_image, thresholds[2])
@@ -104,11 +145,13 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
     plt.imshow(rgb_default, origin='lower')
     
     # Guardar la imagen combinada
-    plt.axhline(y=75, xmin=0.445, xmax=0.555, color='white', linewidth=5)
-    plt.text( 184, 63, '500 au',color='white', fontsize='xx-large')
+    y0, y1 = int(np.shape(red_image)[0]/2 - fov), int(np.shape(red_image)[0]/2 + fov)
+    x0, x1 = int(np.shape(red_image)[1]/2 - fov), int(np.shape(red_image)[1]/2 + fov)
+    plt.plot([0.5*(np.shape(red_image)[0]-reference_label), 0.5*(np.shape(red_image)[0]+reference_label)], [int(y1 - (y1-y0)*0.92), int(y1 - (y1-y0)*0.92)], color="white", linewidth=5)
+    plt.text( int((x0+x1)/2), int(y1 - (y1-y0)*0.95), '500 au',color='white', fontsize='xx-large',ha="center", va="center")
     plt.axis('off')  # Opcional: para quitar los ejes
-    plt.xlim(50,350)
-    plt.ylim(50,350)
+    plt.xlim(x0, x1)
+    plt.ylim(y0, y1)
     plt.savefig(output_path, format='png', bbox_inches='tight', pad_inches=0)
     plt.show()
 
@@ -116,7 +159,7 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
 image_paths = moms_0
 
 # Umbrales para cada imagen, píxeles menores a estos valores se convertirán en NaN
-thresholds = [342, 285, 174]
+thresholds = rms
 
 # Factores de brillo para cada imagen (1.0 = sin cambio, >1.0 = más brillante)
 brightness_factors = [2.0, 4.0, 10.0]  # Ejemplo: hacer la imagen roja 1.5 veces más brillante
