@@ -189,14 +189,14 @@ def generate_moment_map(cube_fits,channel_range=None,smooth=None,polyorder=None,
     cube = cube_fits
     path = cube_fits
     data, velax = bm.load_cube(cube)
-    data = data[int(channel_range[0]):int(channel_range[-1]+1),:,:]
+    #data = data[int(channel_range[0]):int(channel_range[-1]+1),:,:]
     smoothing = smooth if smooth != None else 3
     polyorder_smooth = polyorder if polyorder != None else 0
     N = N_chan_rms if N_chan_rms != None else 5
     smooth_threshold_mask = smooth_threshold_level if smooth_threshold_level != None else 3.0
     first_channel = channel_range[0] if channel_range != None else 0
-    last_channel = channel_range[1] if channel_range != None else -1
-    last_channel = last_channel if last_channel == -1 else int(last_channel-np.shape(data)[2])
+    last_channel = channel_range[1]+1 if channel_range != None else -1
+    #last_channel = last_channel if last_channel == -1 else int(last_channel-np.shape(data)[2])
     output_name = outname if outname != None else cube_fits.split('.fits')[0]
     if moment == None: return "Choose a moment: zeroth or first" 
 
@@ -212,11 +212,11 @@ def generate_moment_map(cube_fits,channel_range=None,smooth=None,polyorder=None,
     
     threshold_mask = bm.get_threshold_mask(data=data,
                                            clip=clipping,
-                                           smooth_threshold_mask=smooth_threshold_level)
+                                           smooth_threshold_mask=smooth_threshold_mask)
 
     channel_mask = bm.get_channel_mask(data=data,
-                                       firstchannel=0,
-                                       lastchannel=-1)
+                                       firstchannel=first_channel,
+                                       lastchannel=last_channel)
 
     mask = bm.get_combined_mask(user_mask=user_mask,
                                 threshold_mask=threshold_mask,
