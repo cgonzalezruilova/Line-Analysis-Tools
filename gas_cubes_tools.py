@@ -355,5 +355,5 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
     plt.savefig('{0}_PV.pdf'.format(outputname))
     return pv_grid
     
-[[182,168],[233,187]]
+
 
