@@ -111,14 +111,8 @@ def rms_mask(cube_data, threshold=None, n_chan_rms=None):
     rms = get_rms(cube_data, n_chan=n_chan_rms)
     mask, hdr = get_mask(cube_data, threshold=threshold*rms)
     rms_mask = np.array(np.sum(mask, axis=0))
-    plt.imshow(rms_mask)
-    plt.show()    
     rms_mask = np.where(rms_mask > 0.0, np.nan, rms_mask)
-    plt.imshow(rms_mask)
-    plt.show()
     rms_mask = np.where(rms_mask == 0.0, 1.0, rms_mask)
-    plt.imshow(rms_mask)
-    plt.show()
     return rms_mask
 
 def threshold_moment_map(cube_data, moment_map, threshold=None, n_chan_rms=None):
