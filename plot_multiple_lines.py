@@ -75,12 +75,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.io import fits
 import matplotlib.colors as mcolors
+from gas_cubes_tools import *
 
+'''
 def load_fits_image(fits_path):
     with fits.open(fits_path) as hdul:
         # Suponemos que la imagen está en la extensión 0
         image_data = hdul[0].data
     return image_data
+'''
 
 def preprocess_image(image_data, threshold):
     # Convertir píxeles menores que el umbral en NaN
@@ -104,11 +107,33 @@ def adjust_brightness(image_data, factor):
     brightened_image = np.clip(image_data, 0, 1) * factor
     return brightened_image
 
-def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_path):
+def rms_mask(cube_data, threshold=None, n_chan_rms=None):
+    rms = get_rms(cube_data, n_chan=n_chan_rms)
+    mask, hdr = get_mask(cube_data, threshold=threshold*rms)
+    rms_mask = np.array(np.sum(mask, axis=0))
+    plt.imshow(rms_mask)
+    plt.show()    
+    rms_mask = np.where(rms_mask > 0.0, np.nan, rms_mask)
+    plt.imshow(rms_mask)
+    plt.show()
+    rms_mask = np.where(rms_mask == 0.0, 1.0, rms_mask)
+    plt.imshow(rms_mask)
+    plt.show()
+    return rms_mask
+
+def threshold_moment_map(cube_data, moment_map, threshold=None, n_chan_rms=None):
+    moment_image, moment_hdr = open_cube(moment_map)
+    moment_image_residual = moment_image*rms_mask(cube_data, threshold=threshold, n_chan_rms=n_chan_rms)
+    rms = np.sqrt(np.array(np.nanmean(moment_image_residual**2)))
+    return rms
+
+
+
+def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_path, fov=None):
     # Cargar y procesar las imágenes para cada canal de color
-    red_image = load_fits_image(image_paths[0])
-    green_image = load_fits_image(image_paths[1])
-    blue_image = load_fits_image(image_paths[2])
+    red_image, red_hdr = open_cube(image_paths[0])
+    green_image, green_hdr = open_cube(image_paths[1])
+    blue_image, blue_hdr = open_cube(image_paths[2])
 
 
     red_image = preprocess_image(red_image, thresholds[0])
@@ -145,6 +170,8 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
     plt.imshow(rgb_default, origin='lower')
     
     # Guardar la imagen combinada
+
+    fov = int(fov/(float(red_hdr['CDELT1'])*3600)) if fov!=None else int(float(red_hdr['NAXIS1'])/2)-1
     y0, y1 = int(np.shape(red_image)[0]/2 - fov), int(np.shape(red_image)[0]/2 + fov)
     x0, x1 = int(np.shape(red_image)[1]/2 - fov), int(np.shape(red_image)[1]/2 + fov)
     plt.plot([0.5*(np.shape(red_image)[0]-reference_label), 0.5*(np.shape(red_image)[0]+reference_label)], [int(y1 - (y1-y0)*0.92), int(y1 - (y1-y0)*0.92)], color="white", linewidth=5)
@@ -154,7 +181,7 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
     plt.ylim(y0, y1)
     plt.savefig(output_path, format='png', bbox_inches='tight', pad_inches=0)
     plt.show()
-
+'''
 # Rutas de las imágenes FITS a superponer (en orden: rojo, verde, azul)
 image_paths = moms_0
 
@@ -169,3 +196,4 @@ output_path = '{0}_combined_rgb_image.png'.format(source)
 
 overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_path)
 
+'''

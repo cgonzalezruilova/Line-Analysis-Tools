@@ -52,21 +52,18 @@ def total_flux(cube_fits,threshold=None,region=None,velocity_range=None):
 
 
 def get_mask(cube_fits,region=None,threshold=None):
-    start = time.time()
-    mask = []
+    start = time.time()   
     cube, hdr = open_cube(cube_fits)
-    mask_region = define_fig(cube[0], form=region[0], center=region[1], radius=region[2]) if region!=None else 1.0 
+    mask_region = define_fig(cube[0], form=region[0], center=region[1], radius=region[2]) if region!=None else 1.0
+    mask = []
     for image in cube:
         new_channel = []
         image = image*mask_region
-        for array in image:
-            new_row = []
-            for pixel in array:
-                new_row += [1.0] if pixel >= threshold else [0.0]
-            new_channel += [new_row]
-        mask += [new_channel]
+        image = np.where(image < threshold, 0.0, image)
+        mask += [np.where(image >= threshold, 1.0, image)]
     end = time.time()
     print('{0} s'.format(end-start))
+    print(mask[0])
     return mask, hdr
 
 
