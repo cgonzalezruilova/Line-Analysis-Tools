@@ -63,7 +63,6 @@ def get_mask(cube_fits,region=None,threshold=None):
         mask += [np.where(image >= threshold, 1.0, image)]
     end = time.time()
     print('{0} s'.format(end-start))
-    print(mask[0])
     return mask, hdr
 
 

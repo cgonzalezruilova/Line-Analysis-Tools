@@ -1,89 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import sys
 from astropy.visualization import make_lupton_rgb
-import math
-from astropy.wcs import WCS
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
-import gas_cubes_tools as gct
-
-
-
-source = 'RA16_27_04.097'
-
-
-
-'''
-
-
-# Moment maps for 12CO
-gct.generate_moment_map(source+'_CO_cube.fits',channel_range=[30,95],moment='zeroth')
-gct.generate_moment_map(source+'_CO_cube.fits',channel_range=[30,95],moment='first')
-# Moment maps for 13CO
-gct.generate_moment_map(source+'_13CO_cube.fits',channel_range=[30,90],moment='zeroth')
-gct.generate_moment_map(source+'_13CO_cube.fits',channel_range=[30,90],moment='first')
-# Moment maps for C18O
-gct.generate_moment_map(source+'_C18O_cube.fits',channel_range=[30,90],moment='zeroth')
-gct.generate_moment_map(source+'_C18O_cube.fits',channel_range=[30,90],moment='first')
-
-
-'''
-
-##################################################################
-##################################################################
-##################################################################
-
-
-source = source
-
-directory='/Volumes/Elements/ODISEA_GAS/'
-
-sufix_0 = '_cube_M0.fits'
-
-trans = ['CO','13CO','C18O']
-
-rms = np.array([86, 121, 68])*3 #[12co,13co,c18o]
-
-fov =  12.0  #radius of FOV in arcsecs
-
-distance = 140.0 #Distance to star in pcs
-
-CDELT1 = 2.777777777778e-05
-
-
-
-
-fov = int(fov/(CDELT1*3600))  #radius of FOV in pixels
-reference_label = 500*(1/(CDELT1*3600))/distance #500 au reference line length in pixels
-
-
-
-moms_0 = [directory+source+'_'+line+sufix_0 for line in trans] 
-
-
-
-
-##################################################################
-##################################################################
-##################################################################
-
-
-
-import matplotlib.pyplot as plt
-import numpy as np
-from astropy.io import fits
-import matplotlib.colors as mcolors
 from gas_cubes_tools import *
 
-'''
-def load_fits_image(fits_path):
-    with fits.open(fits_path) as hdul:
-        # Suponemos que la imagen está en la extensión 0
-        image_data = hdul[0].data
-    return image_data
-'''
+
+
 
 def preprocess_image(image_data, threshold):
     # Convertir píxeles menores que el umbral en NaN
@@ -123,7 +42,7 @@ def threshold_moment_map(cube_data, moment_map, threshold=None, n_chan_rms=None)
 
 
 
-def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_path, fov=None):
+def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_path, fov=None, distance=None):
     # Cargar y procesar las imágenes para cada canal de color
     red_image, red_hdr = open_cube(image_paths[0])
     green_image, green_hdr = open_cube(image_paths[1])
@@ -166,6 +85,7 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
     # Guardar la imagen combinada
 
     fov = int(fov/(float(red_hdr['CDELT1'])*3600)) if fov!=None else int(float(red_hdr['NAXIS1'])/2)-1
+    reference_label = 500*(1/(red_hdr['CDELT1']*3600))/distance
     y0, y1 = int(np.shape(red_image)[0]/2 - fov), int(np.shape(red_image)[0]/2 + fov)
     x0, x1 = int(np.shape(red_image)[1]/2 - fov), int(np.shape(red_image)[1]/2 + fov)
     plt.plot([0.5*(np.shape(red_image)[0]-reference_label), 0.5*(np.shape(red_image)[0]+reference_label)], [int(y1 - (y1-y0)*0.92), int(y1 - (y1-y0)*0.92)], color="white", linewidth=5)
@@ -174,20 +94,5 @@ def overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_
     plt.xlim(x0, x1)
     plt.ylim(y0, y1)
     plt.savefig(output_path, format='png', bbox_inches='tight', pad_inches=0)
-    plt.show()
-'''
-# Rutas de las imágenes FITS a superponer (en orden: rojo, verde, azul)
-image_paths = moms_0
 
-# Umbrales para cada imagen, píxeles menores a estos valores se convertirán en NaN
-thresholds = rms
 
-# Factores de brillo para cada imagen (1.0 = sin cambio, >1.0 = más brillante)
-brightness_factors = [2.0, 4.0, 10.0]  # Ejemplo: hacer la imagen roja 1.5 veces más brillante
-
-# Ruta de salida para la imagen combinada
-output_path = '{0}_combined_rgb_image.png'.format(source)
-
-overlay_fits_images_rgb(image_paths, thresholds, brightness_factors, output_path)
-
-'''
