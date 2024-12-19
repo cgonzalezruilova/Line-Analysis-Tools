@@ -11,7 +11,7 @@ def open_cube(cube_fits):
     hdulist_cube = fits.open(cube_fits)
     hdr_cube = hdulist_cube[0].header
     data_cube = hdulist_cube[0].data
-    images_cube = data_cube[:,:,:,0] if np.shape(np.shape(data_cube))[0] >= 4 else data_cube 
+    images_cube = np.squeeze(data_cube)
     return images_cube, hdr_cube
 
 
