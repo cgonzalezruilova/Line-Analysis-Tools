@@ -34,7 +34,7 @@ def open_continuum(cont_fits):
    images_cont = data_cont[:,:,0,0] if np.shape(np.shape(data_cont))[0] >= 4 else data_cont
    return images_cont, hdr_cont
 
-def plot_channel_maps(cube_fits, velocity_range=None, output_name=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None):
+def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None):
    data_cube, hdr_cube = gm.open_cube(cube_fits)
    n_chan = rms_nchan if rms_nchan!=None else 5 
    rms = gm.get_rms(cube_fits, n_chan=n_chan)
@@ -56,25 +56,8 @@ def plot_channel_maps(cube_fits, velocity_range=None, output_name=None, contours
       xl, yl = np.shape(ind_chan)[1]/2 , np.shape(ind_chan)[0]/2
       pix_coord = [int(xl), int(yl)]
 
-
-   hdr_freq = hdr_cube['CRVAL3']/1e9 #Frequency in GHz
-   hdr_delt_freq = hdr_cube['CDELT3']/1e9 #GHz
-   restfreq = hdr_cube['RESTFRQ']/1e9 #GHz
-   v0_cube = np.round((1 - hdr_freq/restfreq)*c.c/1000, decimals=2) #Initial velocity of the cube [km/s]
-   dchannel = np.round(abs(hdr_delt_freq/restfreq)*c.c/1000.0,decimals=3) #Delta velocity [km/s]
-
-
-   velocity_array = np.array([])
-   for vels_ran in velocity_range.split(','):
-      if ':' in vels_ran: 
-         v0 , vf = float(vels_ran.split(':')[0]), float(vels_ran.split(':')[1])
-         velocity_array = np.append(velocity_array,np.arange(v0,vf+dchannel,dchannel))
-      else:
-         velocity_array = np.append(velocity_array,np.array([float(vels_ran)]))
-
-   channels_array = (velocity_array - v0_cube)/dchannel
-
-   n_plots = np.shape(channels_array)[0]
+   vel_range, chan_range = gm.chans2vel(cube_fits, channel_range=channel_range)
+   n_plots = np.shape(chan_range)[0]
 
    y_figure = int(np.sqrt(n_plots))
    x_figure = int(n_plots/y_figure)+1 if n_plots%y_figure != 0 else int(n_plots/y_figure)
@@ -88,7 +71,7 @@ def plot_channel_maps(cube_fits, velocity_range=None, output_name=None, contours
    extent = [x_extent[0], x_extent[1], y_extent[0], y_extent[1]]
 
    
-   region, threshold = contours
+   region, threshold = contours if contours != None else None, 3*rms
    mask_contour, hdr_mask = gm.get_mask(cube_fits,region=region,threshold=threshold)
 
    fig, axs = plt.subplots(y_figure,x_figure,figsize=(x_figure*1.05,y_figure))
@@ -96,8 +79,8 @@ def plot_channel_maps(cube_fits, velocity_range=None, output_name=None, contours
    for i in np.arange(n_plots):
       i = int(i)
       j, k = int(i/x_figure), int(i%x_figure) #subplot coordinate
-      channel_map = data_cube[int(np.round(channels_array[i]))] #Jy/beam
-      mask_map = mask_contour[int(np.round(channels_array[i]))]
+      channel_map = data_cube[int(chan_range[i])] #Jy/beam
+      mask_map = mask_contour[int(chan_range[i])] if mask_contour != None else 1.
 
       maxval_cube = np.nanmax(data_cube)
       minval_cube = np.nanmin(data_cube)
@@ -129,7 +112,7 @@ def plot_channel_maps(cube_fits, velocity_range=None, output_name=None, contours
       e = Ellipse(xy=[-d*0.8,-d*0.8], width=bmin, height=bmaj, angle=bpa, edgecolor='black', facecolor='white')
       axs[j,k].add_artist(e)
       text_color = 'black' if color_map=='Greys' else 'white'
-      axs[j,k].text(0.3,0.9,'{0:.1f}'.format(velocity_array[i])+ ' km s$^{-1}$',fontsize=5.5,transform=axs[j,k].transAxes,color=text_color)
+      axs[j,k].text(0.3,0.9,'{0:.1f}'.format(vel_range[i])+ ' km s$^{-1}$',fontsize=5.5,transform=axs[j,k].transAxes,color=text_color)
        
       axs[j,k].contour(mask_map,[1.],colors='white',origin='lower',extent=extent, linewidths=0.5)
 
@@ -137,6 +120,7 @@ def plot_channel_maps(cube_fits, velocity_range=None, output_name=None, contours
 
       for n in np.arange(n_plots,y_figure*x_figure)%x_figure:
          axs[int(y_figure-1),int(n)].axis('off')
+      print('Plotted channel {0}'.format(int(chan_range[i])))
 
    plt.subplots_adjust(wspace=0.01,hspace=0.01)
    cbar_ax = fig.add_axes([0.91, 0.11, 0.03, 0.75])
