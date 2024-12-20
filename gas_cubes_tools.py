@@ -12,6 +12,7 @@ def open_cube(cube_fits):
     hdr_cube = hdulist_cube[0].header
     data_cube = hdulist_cube[0].data
     images_cube = np.squeeze(data_cube)
+    print(np.shape(data_cube),np.shape(images_cube))
     return images_cube, hdr_cube
 
 
@@ -113,19 +114,17 @@ def vel2chans(cube_fits,velocity_range=None):
 
 
 def chans2vel(cube_fits,channel_range=None):
-    import scipy.constants as c
-
     cube, hdr = open_cube(cube_fits)
     if channel_range == None:
         channels_array = np.arange(np.shape(cube)[0])
     else:
-        channels_array = []
+        channels_array = np.array([])
         for chan_ran in channel_range.split(','):
             if ':' in chan_ran:
                 chan_0 , chan_f = int(chan_ran.split(':')[0]), int(chan_ran.split(':')[1])
-                channels_array += [np.arange(chan_0, chan_f+1)]
+                channels_array = np.append(channels_array,np.arange(chan_0, chan_f+1))
             else:
-                channels_array += [int(chan_ran)] 
+                channels_array = np.append(channels_array,np.array([int(chan_ran)])) 
 
     hdr_freq = hdr['CRVAL3']/1e9 #Frequency in GHz
     hdr_delt_freq = hdr['CDELT3']/1e9 #GHz
