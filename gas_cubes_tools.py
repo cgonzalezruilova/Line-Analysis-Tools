@@ -350,5 +350,25 @@ def pv_diagrams(cube_fits,coords=None,channels=None,av_width=None,outputname=Non
     plt.savefig('{0}_PV.pdf'.format(outputname))
     return pv_grid
     
+def merge_chans(cube_fits,interval=None,outputname=None):
+    cube,hdr = open_cube(cube_fits)
+    hdr_delt_freq = hdr['CDELT3']/1e9 #GHz
+    restfreq = hdr['RESTFRQ']/1e9 #GHz
+    dchannel = np.round(abs(hdr_delt_freq/restfreq)*c.c/1000.0,decimals=3) #Delta velocity [km/s]
+    chans_number = int(np.round(interval/dchannel))
+    chans_div = int(np.shape(cube)[0]/chans_number)
+    if np.shape(cube)[0]%chans_div != 0:
+        sub_chans_array = np.split(cube[:-int(np.shape(cube)[0]%chans_div)],chans_div)
+    if np.shape(cube)[0]%chans_div == 0:
+        sub_chans_array = np.split(cube,chans_div)
+    merged_cube=[]
+    for sub_channels in sub_chans_array:
+        merged_sub_channels = np.zeros((np.shape(cube)[1],np.shape(cube)[2]))
+        for image in sub_channels:
+            merged_sub_channels += np.array(image/chans_number)
+        merged_cube.append(merged_sub_channels)
 
+    hdr['CDELT3'] = hdr_delt_freq*1e9*chans_number
+
+    fits.writeto(outputname,merged_cube,hdr,overwrite=True)
 
