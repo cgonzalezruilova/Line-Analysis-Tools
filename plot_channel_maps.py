@@ -11,24 +11,19 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 
 """ 
-directory = '/Users/camilogonzalezruilova/Documents/ODISEA_Gas/BDs_ODISEA/RA16_31_36.770/' #Path where is the cube
-data_cube = directory+'RA16_31_36.770_CO_cube.fits' #Fits cube 
-data_cont = directory+'RA16_31_36.770_cont_HR.fits' #Fits continuum for the contours
-
-v0 = -0.3 #Initial velocity channel for the plot [km/s]
-vf =  5.6 #Final velocity channel for the plot [km/s]
-
-n_rms = 5 #Number of channels at the beginning and the end of the cube for rms measurement
-
-d = 17.0 #diameter of image in arcsecs
-
- """
+This routine produces channel maps (pdf) from a data cube in FITS format. 
+Inputs:
+- cube_fits: The path and name of the data cube in string format, e.g: cube_fits='my_path/my_cube.fits'; cube_fits='my_cube.fits'.
+- channel_range: A string with the chosen channels to plot, separating by ":" a range of channels, and by a "," for sub-ranges, 
+  e.g: channel_range = '2:20,28:53' corresponding to channels between 2 to 20 and 28 to 53.
+- contours: 
+"""
 ################################################################################################################################
 ################################################################################################################################
 ################################################################################################################################
 
 
-def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None):
+def plot_channel_maps(cube_fits, channel_range=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None, output_name=None):
    data_cube, hdr_cube = gm.open_cube(cube_fits)
    n_chan = rms_nchan if rms_nchan!=None else 5 
    rms = gm.get_rms(cube_fits, n_chan=n_chan)
@@ -60,7 +55,7 @@ def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=
    dx=hdr_cube['CDELT1']*3600. #deg2arcsec
    dy=hdr_cube['CDELT2']*3600. #deg2arcsec
 
-   x_extent = (np.array([0., data_cube.shape[1]]) - (x0_recentered)) * -dx 
+   x_extent = (np.array([0., data_cube.shape[1]]) - (x0_recentered)) * dx 
    y_extent = (np.array([0., data_cube.shape[2]]) - (y0_recentered)) * dy 
    extent = [x_extent[0], x_extent[1], y_extent[0], y_extent[1]]
 
@@ -96,14 +91,14 @@ def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=
       axs[j,k].set_xlabel('$\Delta$RA [arcsec]') if j==y_figure-1 and k==0 else ''
       
       d = radius_map if radius_map!=None else x_extent[1]
-      axs[j,k].set_xlim(-d,d)
+      axs[j,k].set_xlim(d,-d)
       axs[j,k].set_ylim(-d,d)
 
       from matplotlib.patches import Ellipse        
       bmaj = hdr_cube['BMAJ'] * 3600.
       bmin = hdr_cube['BMIN'] * 3600.
       bpa = hdr_cube['BPA'] - 0.
-      e = Ellipse(xy=[-d*0.8,-d*0.8], width=bmin, height=bmaj, angle=bpa, edgecolor='black', facecolor='white')
+      e = Ellipse(xy=[d*0.8,-d*0.8], width=bmin, height=bmaj, angle=bpa, edgecolor='black', facecolor='white')
       axs[j,k].add_artist(e)
       text_color = 'black' if color_map=='Greys' else 'white'
       axs[j,k].text(0.3,0.9,'{0:.1f}'.format(vel_range[i])+ ' km s$^{-1}$',fontsize=5.5,transform=axs[j,k].transAxes,color=text_color)
