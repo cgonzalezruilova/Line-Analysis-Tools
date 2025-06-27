@@ -27,12 +27,6 @@ d = 17.0 #diameter of image in arcsecs
 ################################################################################################################################
 ################################################################################################################################
 
-def open_continuum(cont_fits):
-   hdulist_cont = fits.open(cont_fits)
-   hdr_cont = hdulist_cont[0].header
-   data_cont = hdulist_cont[0].data
-   images_cont = data_cont[:,:,0,0] if np.shape(np.shape(data_cont))[0] >= 4 else data_cont
-   return images_cont, hdr_cont
 
 def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None):
    data_cube, hdr_cube = gm.open_cube(cube_fits)
@@ -43,7 +37,7 @@ def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=
    
    if continuum_contours != (None,None):
       continuum_fits, range_contours = continuum_contours
-      data_cont, hdr_cont = open_continuum(continuum_fits)
+      data_cont, hdr_cont = gm.open_continuum(continuum_fits)
       maxval_cont = np.nanmax(data_cont)
       w_cont = wcs.WCS(hdr_cont)
       max_index_cont = np.unravel_index(np.nanargmax(data_cont, axis=None), data_cont.shape)
