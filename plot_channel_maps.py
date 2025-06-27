@@ -1,14 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from astropy import wcs
-import scipy.constants as c
-import sys
 import gas_cubes_tools as gm
-import math
-
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
 
 """ 
 This routine produces channel maps (pdf) from a data cube in FITS format. 
