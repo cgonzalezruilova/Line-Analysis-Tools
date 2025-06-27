@@ -7,6 +7,13 @@ import bettermoments as bm
 from scipy.ndimage import rotate
 from decimal import Decimal
 
+def open_continuum(cont_fits):
+   hdulist_cont = fits.open(cont_fits)
+   hdr_cont = hdulist_cont[0].header
+   data_cont = hdulist_cont[0].data
+   images_cont = data_cont[:,:,0,0] if np.shape(np.shape(data_cont))[0] >= 4 else data_cont
+   return images_cont, hdr_cont
+
 def open_cube(cube_fits):
     hdulist_cube = fits.open(cube_fits)
     hdr_cube = hdulist_cube[0].header
