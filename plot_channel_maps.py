@@ -4,7 +4,7 @@ from astropy import wcs
 import gas_cubes_tools as gm
 
 """ 
-This routine produces channel maps (pdf) from a data cube in FITS format. 
+This routine produces channel maps (pdf) from a data cube with FITS format. 
 Inputs:
 - cube_fits: The path and name of the data cube in string format, e.g: cube_fits='my_path/my_cube.fits'; cube_fits='my_cube.fits'.
 - channel_range: A string with the chosen channels to plot, separating by ":" a range of channels, and by a "," for sub-ranges, 
