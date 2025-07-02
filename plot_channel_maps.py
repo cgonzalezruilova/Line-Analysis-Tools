@@ -15,17 +15,23 @@ Inputs:
 ################################################################################################################################
 ################################################################################################################################
 
+def open_continuum(cont_fits):
+   hdulist_cont = fits.open(cont_fits)
+   hdr_cont = hdulist_cont[0].header
+   data_cont = hdulist_cont[0].data
+   images_cont = data_cont[:,:,0,0] if np.shape(np.shape(data_cont))[0] >= 4 else data_cont
+   return images_cont, hdr_cont
 
-def plot_channel_maps(cube_fits, channel_range=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None, output_name=None):
+def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=None, continuum_contours=(None,None), rms_nchan=None, cmap=None, radius_map=None):
    data_cube, hdr_cube = gm.open_cube(cube_fits)
-   n_chan = rms_nchan if rms_nchan!=None else 5 
+   n_chan = rms_nchan if rms_nchan!=None else 5
    rms = gm.get_rms(cube_fits, n_chan=n_chan)
 
    w_cube = wcs.WCS(hdr_cube)
    
    if continuum_contours != (None,None):
       continuum_fits, range_contours = continuum_contours
-      data_cont, hdr_cont = gm.open_continuum(continuum_fits)
+      data_cont, hdr_cont = open_continuum(continuum_fits)
       maxval_cont = np.nanmax(data_cont)
       w_cont = wcs.WCS(hdr_cont)
       max_index_cont = np.unravel_index(np.nanargmax(data_cont, axis=None), data_cont.shape)
@@ -62,6 +68,7 @@ def plot_channel_maps(cube_fits, channel_range=None, contours=None, continuum_co
       i = int(i)
       j, k = int(i/x_figure), int(i%x_figure) #subplot coordinate
       channel_map = data_cube[int(chan_range[i])] #Jy/beam
+      channel_map = np.nan_to_num(channel_map, nan=np.nanmin(channel_map))
       mask_map = mask_contour[int(chan_range[i])] if mask_contour != None else 1.
 
       maxval_cube = np.nanmax(data_cube)
@@ -77,12 +84,12 @@ def plot_channel_maps(cube_fits, channel_range=None, contours=None, continuum_co
                            aspect='auto')
 
 
-      axs[j,k].xaxis.set_ticklabels([]) if j!=y_figure-1 or k>0 else ''
-      axs[j,k].yaxis.set_ticklabels([]) if j!=y_figure-1 or k>0 else ''
+      #axs[j,k].xaxis.set_ticklabels([]) if j!=y_figure-1 or k>0 else ''
+      #axs[j,k].yaxis.set_ticklabels([]) if j!=y_figure-1 or k>0 else ''
+      axs[j,k].xaxis.set_ticklabels([]) if j!=y_figure-1 else axs[j,k].xaxis.set_tick_params(labelsize=7)
+      axs[j,k].yaxis.set_ticklabels([]) if k>0 else axs[j,k].yaxis.set_tick_params(labelsize=7)
       axs[j,k].tick_params(direction='in',color='white')
-      axs[j,k].set_ylabel('$\Delta$DEC [arcsec]') if j==y_figure-1 and k==0 else '' 
-      axs[j,k].set_xlabel('$\Delta$RA [arcsec]') if j==y_figure-1 and k==0 else ''
-      
+
       d = radius_map if radius_map!=None else x_extent[1]
       axs[j,k].set_xlim(d,-d)
       axs[j,k].set_ylim(-d,d)
@@ -105,9 +112,14 @@ def plot_channel_maps(cube_fits, channel_range=None, contours=None, continuum_co
       print('Plotted channel {0}'.format(int(chan_range[i])))
 
    plt.subplots_adjust(wspace=0.01,hspace=0.01)
+   fig.text(0.5, 0.01*y_figure, '$\Delta$RA [$arcsec$]', ha='center', va='center')
+   fig.text(0.01*x_figure, 0.5, '$\Delta$DEC [$arcsec$]', ha='center', va='center',rotation='vertical')
+   #fig.supylabel('$\Delta$DEC [$arcsec$]')
+   #fig.supxlabel('$\Delta$RA [$arcsec$]')
    cbar_ax = fig.add_axes([0.91, 0.11, 0.03, 0.75])
    cbar = fig.colorbar(im,cax=cbar_ax)
    cbar.ax.tick_params(labelsize=8)
    fig.axes[-1].set_title('mJy beam$^{-1}$ km s$^{-1}$',fontsize=8.0,loc='left')
+
 
    fig.savefig(output_name,format='pdf', dpi=300,bbox_inches = 'tight')
