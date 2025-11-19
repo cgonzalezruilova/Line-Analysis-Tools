@@ -119,7 +119,8 @@ def plot_channel_maps(cube_fits, channel_range=None, output_name=None, contours=
    cbar_ax = fig.add_axes([0.91, 0.11, 0.03, 0.75])
    cbar = fig.colorbar(im,cax=cbar_ax)
    cbar.ax.tick_params(labelsize=8)
-   fig.axes[-1].set_title('mJy beam$^{-1}$ km s$^{-1}$',fontsize=8.0,loc='left')
+   cbar.set_label('mJy beam$^{-1}$ km s$^{-1}$',rotation=270,fontsize=8, labelpad=10)
+   #fig.axes[-1].set_title('mJy beam$^{-1}$ km s$^{-1}$',fontsize=8.0,loc='left')
 
 
    fig.savefig(output_name,format='pdf', dpi=300,bbox_inches = 'tight')
